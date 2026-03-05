@@ -103,6 +103,7 @@ export default function InventoryManager({ shopId }: InventoryManagerProps) {
       buying_price: item.buying_price.toString(),
       selling_price: item.selling_price.toString(),
       quantity: item.quantity.toString(),
+      category: item.category || '',
       image_url: item.image_url || '',
     });
     if (item.image_url) {
@@ -136,6 +137,7 @@ export default function InventoryManager({ shopId }: InventoryManagerProps) {
         buying_price: parseFloat(formData.buying_price),
         selling_price: parseFloat(formData.selling_price),
         quantity: parseInt(formData.quantity),
+        category: formData.category || 'General',
         image_url: imageUrl || null,
         updated_at: new Date().toISOString(),
       };

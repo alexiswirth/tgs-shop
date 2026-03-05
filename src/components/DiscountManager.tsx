@@ -50,9 +50,31 @@ export default function DiscountManager({ shopId }: DiscountManagerProps) {
     setDiscounts(data || []);
 
     if (data) {
+      const itemsMap: { [key: string]: string[] } = {};
+      const categoriesMap: { [key: string]: string[] } = {};
+
       for (const discount of data) {
-        await loadDiscountTargets(discount.id);
+        const { data: itemsData } = await supabase
+          .from('discount_items')
+          .select('item_id')
+          .eq('discount_id', discount.id);
+
+        const { data: categoriesData } = await supabase
+          .from('discount_categories')
+          .select('category')
+          .eq('discount_id', discount.id);
+
+        if (itemsData) {
+          itemsMap[discount.id] = itemsData.map(d => d.item_id);
+        }
+
+        if (categoriesData) {
+          categoriesMap[discount.id] = categoriesData.map(d => d.category);
+        }
       }
+
+      setSelectedItemsForDiscount(itemsMap);
+      setSelectedCategoriesForDiscount(categoriesMap);
     }
   };
 
@@ -72,32 +94,6 @@ export default function DiscountManager({ shopId }: DiscountManagerProps) {
 
     const uniqueCategories = Array.from(new Set((data || []).map(item => item.category || 'General')));
     setCategories(uniqueCategories);
-  };
-
-  const loadDiscountTargets = async (discountId: string) => {
-    const { data: itemsData } = await supabase
-      .from('discount_items')
-      .select('item_id')
-      .eq('discount_id', discountId);
-
-    const { data: categoriesData } = await supabase
-      .from('discount_categories')
-      .select('category')
-      .eq('discount_id', discountId);
-
-    if (itemsData) {
-      setSelectedItemsForDiscount(prev => ({
-        ...prev,
-        [discountId]: itemsData.map(d => d.item_id)
-      }));
-    }
-
-    if (categoriesData) {
-      setSelectedCategoriesForDiscount(prev => ({
-        ...prev,
-        [discountId]: categoriesData.map(d => d.category)
-      }));
-    }
   };
 
   const resetForm = () => {
