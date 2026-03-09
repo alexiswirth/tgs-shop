@@ -229,13 +229,18 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
                   onClick={() => addToCart(item)}
                   className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-center gap-3">
+                    {item.image_url && (
+                      <img
+                        src={item.image_url}
+                        alt={item.name}
+                        className="w-16 h-16 object-cover rounded-md border border-gray-200 flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
                       <div className="font-medium text-gray-900">{item.name}</div>
                       <div className="text-sm text-gray-500">Stock: {item.quantity}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-gray-900">
+                      <div className="font-semibold text-gray-900 text-sm mt-1">
                         ${item.selling_price.toFixed(2)}
                       </div>
                     </div>
