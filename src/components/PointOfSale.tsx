@@ -9,6 +9,7 @@ type Discount = Database['public']['Tables']['discounts']['Row'];
 interface CartItem {
   item: Item;
   quantity: number;
+  discountId?: string;
 }
 
 interface PointOfSaleProps {
@@ -17,11 +18,16 @@ interface PointOfSaleProps {
 
 type PaymentMethod = 'cash' | 'credit_card' | 'debit_card' | 'other';
 
+interface DiscountWithDetails extends Discount {
+  items?: string[];
+  categories?: string[];
+}
+
 export default function PointOfSale({ shopId }: PointOfSaleProps) {
   const [items, setItems] = useState<Item[]>([]);
-  const [discounts, setDiscounts] = useState<Discount[]>([]);
+  const [discounts, setDiscounts] = useState<DiscountWithDetails[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [selectedDiscount, setSelectedDiscount] = useState<Discount | null>(null);
+  const [selectedDiscount, setSelectedDiscount] = useState<DiscountWithDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
@@ -57,7 +63,29 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
       .order('name');
 
     if (!error && data) {
-      setDiscounts(data);
+      const discountsWithDetails: DiscountWithDetails[] = await Promise.all(
+        data.map(async (discount) => {
+          const details: DiscountWithDetails = { ...discount, items: [], categories: [] };
+
+          if (discount.applies_to === 'item') {
+            const { data: discountItems } = await supabase
+              .from('discount_items')
+              .select('item_id')
+              .eq('discount_id', discount.id);
+            details.items = discountItems?.map(di => di.item_id) || [];
+          } else if (discount.applies_to === 'category') {
+            const { data: discountCategories } = await supabase
+              .from('discount_categories')
+              .select('category')
+              .eq('discount_id', discount.id);
+            details.categories = discountCategories?.map(dc => dc.category) || [];
+          }
+
+          return details;
+        })
+      );
+
+      setDiscounts(discountsWithDetails);
     }
   };
 
@@ -100,12 +128,44 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
     return cart.reduce((sum, ci) => sum + ci.item.selling_price * ci.quantity, 0);
   };
 
-  const calculateDiscount = (total: number) => {
+  const calculateDiscount = () => {
     if (!selectedDiscount) return 0;
-    if (selectedDiscount.discount_type === 'percentage') {
-      return (total * selectedDiscount.discount_value) / 100;
+
+    if (selectedDiscount.applies_to === 'all') {
+      const total = calculateTotal();
+      if (selectedDiscount.discount_type === 'percentage') {
+        return (total * selectedDiscount.discount_value) / 100;
+      }
+      return selectedDiscount.discount_value;
     }
-    return selectedDiscount.discount_value;
+
+    let totalDiscount = 0;
+
+    if (selectedDiscount.applies_to === 'item') {
+      cart.forEach((ci) => {
+        if (selectedDiscount.items?.includes(ci.item.id)) {
+          const itemSubtotal = ci.item.selling_price * ci.quantity;
+          if (selectedDiscount.discount_type === 'percentage') {
+            totalDiscount += (itemSubtotal * selectedDiscount.discount_value) / 100;
+          } else {
+            totalDiscount += selectedDiscount.discount_value;
+          }
+        }
+      });
+    } else if (selectedDiscount.applies_to === 'category') {
+      cart.forEach((ci) => {
+        if (selectedDiscount.categories?.includes(ci.item.category || '')) {
+          const itemSubtotal = ci.item.selling_price * ci.quantity;
+          if (selectedDiscount.discount_type === 'percentage') {
+            totalDiscount += (itemSubtotal * selectedDiscount.discount_value) / 100;
+          } else {
+            totalDiscount += selectedDiscount.discount_value;
+          }
+        }
+      });
+    }
+
+    return totalDiscount;
   };
 
   const processSale = async () => {
