@@ -258,36 +258,43 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
                   {cart.map((ci) => (
                     <div
                       key={ci.item.id}
-                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200"
+                      className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200"
                     >
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900">{ci.item.name}</div>
+                      {ci.item.image_url && (
+                        <img
+                          src={ci.item.image_url}
+                          alt={ci.item.name}
+                          className="w-12 h-12 object-cover rounded-md border border-gray-200 flex-shrink-0"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 truncate">{ci.item.name}</div>
                         <div className="text-sm text-gray-500">
                           ${ci.item.selling_price.toFixed(2)} × {ci.quantity}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() => updateQuantity(ci.item.id, -1)}
                           className="p-1 text-gray-600 hover:bg-gray-100 rounded"
                         >
-                          <Minus className="w-4 h-4" />
+                          <Minus className="w-3 h-3" />
                         </button>
-                        <span className="font-semibold w-8 text-center">{ci.quantity}</span>
+                        <span className="font-semibold w-6 text-center text-sm">{ci.quantity}</span>
                         <button
                           onClick={() => updateQuantity(ci.item.id, 1)}
                           className="p-1 text-gray-600 hover:bg-gray-100 rounded"
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus className="w-3 h-3" />
                         </button>
                         <button
                           onClick={() => removeFromCart(ci.item.id)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded ml-2"
+                          className="p-1 text-red-600 hover:bg-red-50 rounded ml-1"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
-                      <div className="font-semibold text-gray-900 ml-4 w-20 text-right">
+                      <div className="font-semibold text-gray-900 ml-2 w-16 text-right text-sm">
                         ${(ci.item.selling_price * ci.quantity).toFixed(2)}
                       </div>
                     </div>
