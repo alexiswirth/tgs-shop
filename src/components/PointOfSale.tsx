@@ -128,6 +128,24 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
     return cart.reduce((sum, ci) => sum + ci.item.selling_price * ci.quantity, 0);
   };
 
+  const isItemDiscountApplicable = (itemId: string) => {
+    if (!selectedDiscount) return false;
+    if (selectedDiscount.applies_to === 'all') return true;
+    if (selectedDiscount.applies_to === 'item') {
+      return selectedDiscount.items?.includes(itemId) || false;
+    }
+    return false;
+  };
+
+  const isCategoryDiscountApplicable = (category: string) => {
+    if (!selectedDiscount) return false;
+    if (selectedDiscount.applies_to === 'all') return true;
+    if (selectedDiscount.applies_to === 'category') {
+      return selectedDiscount.categories?.includes(category) || false;
+    }
+    return false;
+  };
+
   const calculateDiscount = () => {
     if (!selectedDiscount) return 0;
 
@@ -171,16 +189,16 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
   const processSale = async () => {
     if (cart.length === 0) return;
 
-    if (paymentMethod === 'cash' && (cashGiven === '' || cashGiven < calculateTotal() - calculateDiscount(calculateTotal()))) {
+    const totalAmount = calculateTotal();
+    const discountAmount = calculateDiscount();
+    const finalAmount = totalAmount - discountAmount;
+
+    if (paymentMethod === 'cash' && (cashGiven === '' || cashGiven < finalAmount)) {
       alert('Please enter the correct cash amount');
       return;
     }
 
     setLoading(true);
-
-    const totalAmount = calculateTotal();
-    const discountAmount = calculateDiscount(totalAmount);
-    const finalAmount = totalAmount - discountAmount;
     const changeAmount = paymentMethod === 'cash' ? Number(cashGiven) - finalAmount : 0;
 
     const { data: saleData, error: saleError } = await supabase
