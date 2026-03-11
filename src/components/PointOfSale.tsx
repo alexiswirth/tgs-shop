@@ -9,6 +9,7 @@ type Discount = Database['public']['Tables']['discounts']['Row'];
 interface CartItem {
   item: Item;
   quantity: number;
+  discountId?: string;
 }
 
 interface PointOfSaleProps {
@@ -17,11 +18,16 @@ interface PointOfSaleProps {
 
 type PaymentMethod = 'cash' | 'credit_card' | 'debit_card' | 'other';
 
+interface DiscountWithDetails extends Discount {
+  items?: string[];
+  categories?: string[];
+}
+
 export default function PointOfSale({ shopId }: PointOfSaleProps) {
   const [items, setItems] = useState<Item[]>([]);
-  const [discounts, setDiscounts] = useState<Discount[]>([]);
+  const [discounts, setDiscounts] = useState<DiscountWithDetails[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [selectedDiscount, setSelectedDiscount] = useState<Discount | null>(null);
+  const [selectedDiscount, setSelectedDiscount] = useState<DiscountWithDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
@@ -57,7 +63,29 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
       .order('name');
 
     if (!error && data) {
-      setDiscounts(data);
+      const discountsWithDetails: DiscountWithDetails[] = await Promise.all(
+        data.map(async (discount) => {
+          const details: DiscountWithDetails = { ...discount, items: [], categories: [] };
+
+          if (discount.applies_to === 'item') {
+            const { data: discountItems } = await supabase
+              .from('discount_items')
+              .select('item_id')
+              .eq('discount_id', discount.id);
+            details.items = discountItems?.map(di => di.item_id) || [];
+          } else if (discount.applies_to === 'category') {
+            const { data: discountCategories } = await supabase
+              .from('discount_categories')
+              .select('category')
+              .eq('discount_id', discount.id);
+            details.categories = discountCategories?.map(dc => dc.category) || [];
+          }
+
+          return details;
+        })
+      );
+
+      setDiscounts(discountsWithDetails);
     }
   };
 
@@ -100,12 +128,44 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
     return cart.reduce((sum, ci) => sum + ci.item.selling_price * ci.quantity, 0);
   };
 
-  const calculateDiscount = (total: number) => {
+  const calculateDiscount = () => {
     if (!selectedDiscount) return 0;
-    if (selectedDiscount.discount_type === 'percentage') {
-      return (total * selectedDiscount.discount_value) / 100;
+
+    if (selectedDiscount.applies_to === 'all') {
+      const total = calculateTotal();
+      if (selectedDiscount.discount_type === 'percentage') {
+        return (total * selectedDiscount.discount_value) / 100;
+      }
+      return selectedDiscount.discount_value;
     }
-    return selectedDiscount.discount_value;
+
+    let totalDiscount = 0;
+
+    if (selectedDiscount.applies_to === 'item') {
+      cart.forEach((ci) => {
+        if (selectedDiscount.items?.includes(ci.item.id)) {
+          const itemSubtotal = ci.item.selling_price * ci.quantity;
+          if (selectedDiscount.discount_type === 'percentage') {
+            totalDiscount += (itemSubtotal * selectedDiscount.discount_value) / 100;
+          } else {
+            totalDiscount += selectedDiscount.discount_value;
+          }
+        }
+      });
+    } else if (selectedDiscount.applies_to === 'category') {
+      cart.forEach((ci) => {
+        if (selectedDiscount.categories?.includes(ci.item.category || '')) {
+          const itemSubtotal = ci.item.selling_price * ci.quantity;
+          if (selectedDiscount.discount_type === 'percentage') {
+            totalDiscount += (itemSubtotal * selectedDiscount.discount_value) / 100;
+          } else {
+            totalDiscount += selectedDiscount.discount_value;
+          }
+        }
+      });
+    }
+
+    return totalDiscount;
   };
 
   const processSale = async () => {
@@ -229,13 +289,18 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
                   onClick={() => addToCart(item)}
                   className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-center gap-3">
+                    {item.image_url && (
+                      <img
+                        src={item.image_url}
+                        alt={item.name}
+                        className="w-16 h-16 object-cover rounded-md border border-gray-200 flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
                       <div className="font-medium text-gray-900">{item.name}</div>
                       <div className="text-sm text-gray-500">Stock: {item.quantity}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-gray-900">
+                      <div className="font-semibold text-gray-900 text-sm mt-1">
                         ${item.selling_price.toFixed(2)}
                       </div>
                     </div>
@@ -258,36 +323,43 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
                   {cart.map((ci) => (
                     <div
                       key={ci.item.id}
-                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200"
+                      className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200"
                     >
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900">{ci.item.name}</div>
+                      {ci.item.image_url && (
+                        <img
+                          src={ci.item.image_url}
+                          alt={ci.item.name}
+                          className="w-12 h-12 object-cover rounded-md border border-gray-200 flex-shrink-0"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 truncate">{ci.item.name}</div>
                         <div className="text-sm text-gray-500">
                           ${ci.item.selling_price.toFixed(2)} × {ci.quantity}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() => updateQuantity(ci.item.id, -1)}
                           className="p-1 text-gray-600 hover:bg-gray-100 rounded"
                         >
-                          <Minus className="w-4 h-4" />
+                          <Minus className="w-3 h-3" />
                         </button>
-                        <span className="font-semibold w-8 text-center">{ci.quantity}</span>
+                        <span className="font-semibold w-6 text-center text-sm">{ci.quantity}</span>
                         <button
                           onClick={() => updateQuantity(ci.item.id, 1)}
                           className="p-1 text-gray-600 hover:bg-gray-100 rounded"
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus className="w-3 h-3" />
                         </button>
                         <button
                           onClick={() => removeFromCart(ci.item.id)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded ml-2"
+                          className="p-1 text-red-600 hover:bg-red-50 rounded ml-1"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
-                      <div className="font-semibold text-gray-900 ml-4 w-20 text-right">
+                      <div className="font-semibold text-gray-900 ml-2 w-16 text-right text-sm">
                         ${(ci.item.selling_price * ci.quantity).toFixed(2)}
                       </div>
                     </div>
