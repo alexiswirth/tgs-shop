@@ -209,7 +209,6 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
     }
 
     const saleItems = cart.map((ci) => {
-      const taxAmount = ci.item.tax * ci.quantity;
       return {
         sale_id: saleData.id,
         item_id: ci.item.id,
@@ -217,8 +216,6 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
         quantity: ci.quantity,
         unit_price: ci.item.selling_price,
         subtotal: ci.item.selling_price * ci.quantity,
-        tax_amount: taxAmount,
-        buying_price: ci.item.buying_price,
       };
     });
 

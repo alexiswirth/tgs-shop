@@ -152,8 +152,6 @@ export interface Database {
           quantity: number
           unit_price: number
           subtotal: number
-          tax_amount: number
-          buying_price: number
         }
         Insert: {
           id?: string
@@ -163,8 +161,6 @@ export interface Database {
           quantity: number
           unit_price: number
           subtotal: number
-          tax_amount?: number
-          buying_price: number
         }
         Update: {
           id?: string
@@ -174,8 +170,6 @@ export interface Database {
           quantity?: number
           unit_price?: number
           subtotal?: number
-          tax_amount?: number
-          buying_price?: number
         }
       }
       discount_items: {
