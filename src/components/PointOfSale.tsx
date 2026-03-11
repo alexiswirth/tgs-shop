@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { ShoppingCart, Plus, Minus, Trash2, DollarSign } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 
-type Item = Database['public']['Tables']['items']['Row'];
+type Item = Database['public']['Tables']['items']['Row'] & { image_url?: string | null };
 type Discount = Database['public']['Tables']['discounts']['Row'];
 
 interface CartItem {
@@ -64,7 +64,7 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
 
     if (!error && data) {
       const discountsWithDetails: DiscountWithDetails[] = await Promise.all(
-        data.map(async (discount) => {
+        data.map(async (discount: any) => {
           const details: DiscountWithDetails = { ...discount, items: [], categories: [] };
 
           if (discount.applies_to === 'item') {
@@ -72,13 +72,13 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
               .from('discount_items')
               .select('item_id')
               .eq('discount_id', discount.id);
-            details.items = discountItems?.map(di => di.item_id) || [];
+            details.items = discountItems?.map((di: any) => di.item_id) || [];
           } else if (discount.applies_to === 'category') {
             const { data: discountCategories } = await supabase
               .from('discount_categories')
               .select('category')
               .eq('discount_id', discount.id);
-            details.categories = discountCategories?.map(dc => dc.category) || [];
+            details.categories = discountCategories?.map((dc: any) => dc.category) || [];
           }
 
           return details;
@@ -126,24 +126,6 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
 
   const calculateTotal = () => {
     return cart.reduce((sum, ci) => sum + ci.item.selling_price * ci.quantity, 0);
-  };
-
-  const isItemDiscountApplicable = (itemId: string) => {
-    if (!selectedDiscount) return false;
-    if (selectedDiscount.applies_to === 'all') return true;
-    if (selectedDiscount.applies_to === 'item') {
-      return selectedDiscount.items?.includes(itemId) || false;
-    }
-    return false;
-  };
-
-  const isCategoryDiscountApplicable = (category: string) => {
-    if (!selectedDiscount) return false;
-    if (selectedDiscount.applies_to === 'all') return true;
-    if (selectedDiscount.applies_to === 'category') {
-      return selectedDiscount.categories?.includes(category) || false;
-    }
-    return false;
   };
 
   const calculateDiscount = () => {
@@ -201,23 +183,25 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
     setLoading(true);
     const changeAmount = paymentMethod === 'cash' ? Number(cashGiven) - finalAmount : 0;
 
-    const { data: saleData, error: saleError } = await supabase
-      .from('sales')
-      .insert([
-        {
-          shop_id: shopId,
-          total_amount: totalAmount,
-          discount_id: selectedDiscount?.id || null,
-          discount_amount: discountAmount,
-          final_amount: finalAmount,
-          paidBy: paymentMethod,
-          payment_method: paymentMethod,
-          cash_given: paymentMethod === 'cash' ? Number(cashGiven) : null,
-          change_amount: changeAmount,
-        },
-      ])
+    const salePayload = {
+      shop_id: shopId,
+      total_amount: totalAmount,
+      discount_id: selectedDiscount?.id || null,
+      discount_amount: discountAmount,
+      final_amount: finalAmount,
+      paidBy: paymentMethod,
+      payment_method: paymentMethod,
+      cash_given: paymentMethod === 'cash' ? Number(cashGiven) : null,
+      change_amount: changeAmount,
+    };
+
+    console.log('Sale payload:', salePayload);
+
+    const { data: saleData, error: saleError } = await (supabase
+      .from('sales') as any)
+      .insert([salePayload])
       .select()
-      .single();
+      .single() as { data: { id: string } | null; error: any };
 
     if (saleError || !saleData) {
       console.error('Error creating sale:', saleError);
@@ -241,7 +225,7 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
 
     const { error: itemsError } = await supabase
       .from('sale_items')
-      .insert(saleItems);
+      .insert(saleItems as any);
 
     if (itemsError) {
       console.error('Error creating sale items:', itemsError);
@@ -250,8 +234,8 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
     }
 
     for (const ci of cart) {
-      await supabase
-        .from('items')
+      await (supabase
+        .from('items') as any)
         .update({ quantity: ci.item.quantity - ci.quantity, updated_at: new Date().toISOString() })
         .eq('id', ci.item.id);
     }
@@ -276,7 +260,7 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
   );
 
   const total = calculateTotal();
-  const discountAmount = calculateDiscount(total);
+  const discountAmount = calculateDiscount();
   const finalAmount = total - discountAmount;
 
   return (
@@ -486,7 +470,7 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
                     min="0"
                     value={cashGiven}
                     onChange={(e) => setCashGiven(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    placeholder={`Minimum: $${(calculateTotal() - calculateDiscount(calculateTotal())).toFixed(2)}`}
+                    placeholder={`Minimum: $${finalAmount.toFixed(2)}`}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   {cashGiven !== '' && (
@@ -494,11 +478,11 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
                       <div className="text-sm text-gray-600">
                         <div className="flex justify-between mb-2">
                           <span>Total:</span>
-                          <span className="font-semibold">${(calculateTotal() - calculateDiscount(calculateTotal())).toFixed(2)}</span>
+                          <span className="font-semibold">${finalAmount.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-green-600 font-semibold">
                           <span>Change:</span>
-                          <span>${(Number(cashGiven) - (calculateTotal() - calculateDiscount(calculateTotal()))).toFixed(2)}</span>
+                          <span>${(Number(cashGiven) - finalAmount).toFixed(2)}</span>
                         </div>
                       </div>
                     </div>
@@ -519,7 +503,7 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
               </button>
               <button
                 onClick={processSale}
-                disabled={loading || (paymentMethod === 'cash' && (cashGiven === '' || Number(cashGiven) < (calculateTotal() - calculateDiscount(calculateTotal()))))}
+                disabled={loading || (paymentMethod === 'cash' && (cashGiven === '' || Number(cashGiven) < finalAmount))}
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors font-medium"
               >
                 {loading ? 'Processing...' : 'Confirm Payment'}
