@@ -210,8 +210,9 @@ export default function PointOfSale({ shopId }: PointOfSaleProps) {
           discount_id: selectedDiscount?.id || null,
           discount_amount: discountAmount,
           final_amount: finalAmount,
+          paidBy: paymentMethod,
           payment_method: paymentMethod,
-          cash_given: paymentMethod === 'cash' ? cashGiven : null,
+          cash_given: paymentMethod === 'cash' ? Number(cashGiven) : null,
           change_amount: changeAmount,
         },
       ])

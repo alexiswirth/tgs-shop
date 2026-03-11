@@ -111,6 +111,10 @@ export interface Database {
           discount_amount: number
           final_amount: number
           sale_date: string
+          paidBy: string
+          payment_method: string | null
+          cash_given: number | null
+          change_amount: number | null
           created_at: string
         }
         Insert: {
@@ -121,6 +125,10 @@ export interface Database {
           discount_amount?: number
           final_amount: number
           sale_date?: string
+          paidBy: string
+          payment_method?: string | null
+          cash_given?: number | null
+          change_amount?: number | null
           created_at?: string
         }
         Update: {
@@ -131,6 +139,10 @@ export interface Database {
           discount_amount?: number
           final_amount?: number
           sale_date?: string
+          paidBy?: string
+          payment_method?: string | null
+          cash_given?: number | null
+          change_amount?: number | null
           created_at?: string
         }
       }
