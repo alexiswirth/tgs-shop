@@ -19,12 +19,14 @@ export default function SalesReports({ shopId }: SalesReportsProps) {
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState('all');
   const [selectedSale, setSelectedSale] = useState<SaleWithItems | null>(null);
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   useEffect(() => {
     if (shopId) {
       loadSales();
     }
-  }, [shopId, dateFilter]);
+  }, [shopId, dateFilter, customStartDate, customEndDate]);
 
   const loadSales = async () => {
     setLoading(true);
@@ -39,22 +41,36 @@ export default function SalesReports({ shopId }: SalesReportsProps) {
       .order('sale_date', { ascending: false });
 
     if (dateFilter !== 'all') {
-      const now = new Date();
-      let startDate = new Date();
+      if (dateFilter === 'custom') {
+        // Custom date range with separate start/end date states
+        if (customStartDate && customEndDate) {
+          const startDateTime = new Date(customStartDate);
+          startDateTime.setHours(0, 0, 0, 0);
+          const endDateTime = new Date(customEndDate);
+          endDateTime.setHours(23, 59, 59, 999);
+          query = query
+            .gte('sale_date', startDateTime.toISOString())
+            .lte('sale_date', endDateTime.toISOString());
+        }
+      } else {
+        // Handle other date filters
+        const now = new Date();
+        let startDate = new Date();
 
-      switch (dateFilter) {
-        case 'today':
-          startDate.setHours(0, 0, 0, 0);
-          break;
-        case 'week':
-          startDate.setDate(now.getDate() - 7);
-          break;
-        case 'month':
-          startDate.setMonth(now.getMonth() - 1);
-          break;
+        switch (dateFilter) {
+          case 'today':
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          case 'week':
+            startDate.setDate(now.getDate() - 7);
+            break;
+          case 'month':
+            startDate.setMonth(now.getMonth() - 1);
+            break;
+        }
+
+        query = query.gte('sale_date', startDate.toISOString());
       }
-
-      query = query.gte('sale_date', startDate.toISOString());
     }
 
     const { data, error } = await query;
@@ -137,7 +153,26 @@ export default function SalesReports({ shopId }: SalesReportsProps) {
               <option value="today">Today</option>
               <option value="week">Last 7 Days</option>
               <option value="month">Last 30 Days</option>
+              <option value="custom">Custom Range</option>
             </select>
+            {dateFilter === 'custom' && (
+              <>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Start date"
+                />
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="End date"
+                />
+              </>
+            )}
             <button
               onClick={exportToCSV}
               disabled={sales.length === 0}

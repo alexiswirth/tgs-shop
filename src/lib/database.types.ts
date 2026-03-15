@@ -145,6 +145,8 @@ export interface Database {
       }
       sale_items: {
         Row: {
+          buying_price: number
+          tax_amount: number
           id: string
           sale_id: string
           item_id: string
